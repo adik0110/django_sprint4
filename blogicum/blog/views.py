@@ -141,6 +141,7 @@ class ProfileUpdateView(LoginRequiredMixin, UpdateView):
     def get_object(self):
         return self.request.user
 
+
 class PostCreateView(PostMixin, LoginRequiredMixin, CreateView):
     pk_url_kwarg = 'post_id'
 
