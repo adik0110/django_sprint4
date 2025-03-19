@@ -2,7 +2,8 @@ from django.http import Http404
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
-from django.views.generic import DetailView, ListView, UpdateView, CreateView, DeleteView
+from django.views.generic import (DetailView, ListView, UpdateView, CreateView,
+                                  DeleteView)
 from django.contrib.auth import logout
 from django.shortcuts import redirect
 from django.urls import reverse
@@ -15,6 +16,7 @@ def filter_posts(request):
     return request.filter(is_published=True,
                           category__is_published=True,
                           pub_date__lte=timezone.now())
+
 
 def post_detail(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
@@ -45,6 +47,7 @@ class PostMixin:
     model = Post
     fields = ['title', 'text', 'pub_date', 'image', 'location', 'category']
     template_name = 'blog/create.html'
+
 
 class CommentMixin:
     model = Comment
@@ -135,6 +138,7 @@ class ProfileUpdateView(LoginRequiredMixin, UpdateView):
     def get_success_url(self):
         return reverse('blog:profile', kwargs={'username': self.request.user})
 
+
     def get_object(self):
         return self.request.user
 
@@ -143,6 +147,7 @@ class PostCreateView(PostMixin, LoginRequiredMixin, CreateView):
 
     def get_success_url(self):
         return reverse('blog:profile', kwargs={'username': self.request.user})
+
 
     def form_valid(self, form):
         form.instance.author = self.request.user
@@ -158,6 +163,7 @@ class PostUpdateView(AuthorRequiredMixin, PostMixin, UpdateView):
             kwargs={'pk': self.kwargs['pk']}
         )
 
+
 class PostDeleteView(AuthorRequiredMixin, PostMixin, DeleteView):
     pk_url_kwarg = 'post_id'
 
@@ -166,25 +172,46 @@ class PostDeleteView(AuthorRequiredMixin, PostMixin, DeleteView):
 
 
 class CommentCreateView(LoginRequiredMixin, CreateView, CommentMixin):
+    form_class = CommentForm
     publication = None
 
     def dispatch(self, request, *args, **kwargs):
         self.publication = get_object_or_404(Post, pk=kwargs['post_id'])
         return super().dispatch(request, *args, **kwargs)
 
+
     def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={'post_id': self.kwargs['post_id']})
+        return reverse('blog:post_detail',
+                       kwargs={'post_id': self.kwargs['post_id']})
+
 
     def form_valid(self, form):
         form.instance.author = self.request.user
         form.instance.post = self.publication
         return super().form_valid(form)
 
-class CommentUpdateView(AuthorRequiredMixin, UpdateView, CommentMixin):
+
+    def get_queryset(self):
+        return Comment.objects.filter(post=self.kwargs['post_id'])
+
+
+class CommentUpdateView(AuthorRequiredMixin, UpdateView):
+    model = Comment
+    fields = ['text']
+    template_name = 'blog/comment.html'
     pk_url_kwarg = 'comment_id'
 
-class CommentDeleteView(AuthorRequiredMixin, PostMixin, DeleteView):
+    def get_queryset(self):
+        return Comment.objects.filter(post=self.kwargs['post_id'])
+
+
+    def get_success_url(self):
+        return reverse('blog:post_detail', kwargs={'post_id': self.kwargs['post_id']})
+
+
+class CommentDeleteView(AuthorRequiredMixin, CommentMixin, DeleteView):
     pk_url_kwarg = 'comment_id'
 
     def get_success_url(self):
-        return reverse('blog:index')
+        return reverse('blog:post_detail',
+                       kwargs={'post_id': self.kwargs['post_id']})
