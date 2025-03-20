@@ -27,7 +27,6 @@ def post_detail(request, post_id):
             and not request.user == post.author):
         raise Http404()
 
-
     context = {
         'post': post,
         'form': CommentForm(),
@@ -35,6 +34,7 @@ def post_detail(request, post_id):
     }
 
     return render(request, 'blog/detail.html', context)
+
 
 class AuthorRequiredMixin(LoginRequiredMixin):
     def dispatch(self, request, *args, **kwargs):
@@ -110,9 +110,7 @@ class ProfileListView(ListView):
         username = self.kwargs['username']
         self.user = get_object_or_404(User, username=username)
 
-        post_list = Post.objects.select_related(
-            'category', 'location', 'author'
-        ).filter(author__exact=self.user)
+        post_list = Post.objects.filter(author__exact=self.user)
 
         if self.request.user != self.user:
             post_list = filter_posts(post_list)
@@ -172,7 +170,6 @@ class PostDeleteView(AuthorRequiredMixin, PostMixin, DeleteView):
 
 class CommentCreateView(LoginRequiredMixin, CreateView, CommentMixin):
     form_class = CommentForm
-    publication = None
 
     def dispatch(self, request, *args, **kwargs):
         self.publication = get_object_or_404(Post, pk=kwargs['post_id'])
