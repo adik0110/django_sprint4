@@ -2,7 +2,7 @@ from django.http import Http404
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
-from django.views.generic import (ListView, UpdateView, CreateView,
+from django.views.generic import (DetailView, ListView, UpdateView, CreateView,
                                   DeleteView)
 from django.contrib.auth import logout
 from django.shortcuts import redirect
@@ -22,10 +22,12 @@ def post_detail(request, post_id):
     post = get_object_or_404(Post, pk=post_id)
     current_time = timezone.now()
 
-    if (post.pub_date > current_time
+    if ((post.pub_date > current_time
             or not post.is_published
-            or not post.category.is_published):
+            or not post.category.is_published) and
+            not request.user == post.author):
         raise Http404()
+
 
     context = {
         'post': post,
@@ -36,7 +38,7 @@ def post_detail(request, post_id):
     return render(request, 'blog/detail.html', context)
 
 
-class AuthorRequiredMixin:
+class AuthorRequiredMixin(LoginRequiredMixin):
     def dispatch(self, request, *args, **kwargs):
         if request.user != self.get_object().author:
             return redirect(self.get_success_url())
@@ -104,7 +106,7 @@ class CategoryPostListView(ListView):
 
 class ProfileListView(ListView):
     template_name = 'blog/profile.html'
-    paginate_by = 5
+    paginate_by = 10
 
     def get_queryset(self):
         username = self.kwargs['username']
@@ -159,7 +161,7 @@ class PostUpdateView(AuthorRequiredMixin, PostMixin, UpdateView):
     def get_success_url(self):
         return reverse(
             'blog:post_detail',
-            kwargs={'pk': self.kwargs['pk']}
+            kwargs={'post_id': self.kwargs['post_id']}
         )
 
 
@@ -205,9 +207,16 @@ class CommentUpdateView(AuthorRequiredMixin, UpdateView):
                        kwargs={'post_id': self.kwargs['post_id']})
 
 
-class CommentDeleteView(AuthorRequiredMixin, CommentMixin, DeleteView):
+
+class CommentDeleteView(AuthorRequiredMixin, DeleteView):
+    model = Comment
+    template_name = 'blog/comment.html'
     pk_url_kwarg = 'comment_id'
 
     def get_success_url(self):
-        return reverse('blog:post_detail',
-                       kwargs={'post_id': self.kwargs['post_id']})
+        return reverse('blog:index')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form'] = None
+        return context
